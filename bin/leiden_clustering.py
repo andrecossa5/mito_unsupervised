@@ -15,9 +15,8 @@ my_parser = argparse.ArgumentParser(
     prog='leiden_clustering',
     description=
     '''
-    Takes each sample AFM and its top analysis distance matrices, subset for each cell (row)
-    k neighbors, apply the UMAP kernel and partition each resulting kNN graph across some resolutions. 
-    Save the output.
+    Takes each sample AFM and partition the resulting kNN graph across some resolutions
+    with the leiden algorithm.
     '''
 )
 
@@ -26,11 +25,75 @@ my_parser = argparse.ArgumentParser(
 # Path_main
 my_parser.add_argument(
     '-p', 
-    '--path_main', 
+    '--path_data', 
     type=str,
     default='..',
-    help='The path to the main project directory. Default: .. .'
+    help='Path to samples data. Default: .. .'
 )
+
+# Filter
+my_parser.add_argument(
+    '--sample', 
+    type=str,
+    default='MDA_clones',
+    help='Sample to use. Default: MDA_clones.'
+)
+
+# Filter
+my_parser.add_argument(
+    '--filtering', 
+    type=str,
+    default='ludwig2019',
+    help='Method to filter MT-SNVs. Default: ludwig2019.'
+)
+
+# Dimred
+my_parser.add_argument(
+    '--dimred', 
+    type=str,
+    default='no_dimred',
+    help='Method to reduce the dimension of the SNVs space (top 1000 SNVs selected) by pegasus. Default: no_dimred.'
+)
+
+# Dimred
+my_parser.add_argument(
+    '--n_comps', 
+    type=int,
+    default=30,
+    help='n of components in the dimensionality reduction step. Default: 30.'
+)
+
+# GS_mode
+my_parser.add_argument(
+    '--ncores', 
+    type=int,
+    default=8,
+    help='n of cores used for MQuad filtering and silhouette scoring. Default: 8.'
+)
+
+# min_cell_number
+my_parser.add_argument(
+    '--min_cell_number', 
+    type=int,
+    default=10,
+    help='Include in the analysis only cells with membership in clones with >= min_cell_number. Default: 10.'
+)
+
+# min_cov_treshold
+my_parser.add_argument(
+    '--min_cov_treshold', 
+    type=int,
+    default=50,
+    help='Include in the analysis only cells MAESTER sites mean coverage > min_cov_treshold. Default: 50.'
+)
+
+# Score
+# my_parser.add_argument(
+#     '--blacklist', 
+#     type=str,
+#     default='.',
+#     help='Path to variant blacklist file. Default: ..'
+# )
 
 # Resolution range
 my_parser.add_argument(
@@ -40,12 +103,20 @@ my_parser.add_argument(
     help='Resolution range for leiden clustering. Default: 0.2:1.'
 )
 
-# ncores
+# n resolution values
 my_parser.add_argument(
-    '--ncores', 
+    '--n', 
     type=int,
-    default=8,
-    help='ncores to use for model training. Default: 8.'
+    default=10,
+    help='n resolution values to partition the kNN graph with. Default: 10.'
+)
+
+# min_cov_treshold
+my_parser.add_argument(
+    '--k', 
+    type=int,
+    default=30,
+    help='k neighbors. Default: 30.'
 )
 
 # skip
@@ -58,9 +129,18 @@ my_parser.add_argument(
 # Parse arguments
 args = my_parser.parse_args()
 
-path_main = args.path_main
+path_data = args.path_data
+sample = args.sample
+dimred = args.dimred
+filtering = args.filtering if dimred == 'no_dimred' else 'pegasus'
+min_cell_number = args.min_cell_number
+min_cov_treshold = args.min_cov_treshold
+n_comps = args.n_comps
+# path_blacklist = args.blacklist
 res_range = res_range = [ float(x) for x in args.range.split(':') ]
-ncores = args.ncores 
+ncores = args.ncores
+k = args.k
+n = args.n
 
 ########################################################################
 
@@ -68,31 +148,20 @@ ncores = args.ncores
 if not args.skip:
 
     # Code
-    import pickle
-    from Cellula._utils import Timer, set_logger
-    from Cellula.preprocessing._metrics import *
-    from Cellula.plotting._plotting_base import *
-    from Cellula.plotting._colors import *
-    from MI_TO.preprocessing import *
-    from MI_TO.kNN import *
-    from MI_TO.spectral_clustering import *
-    from MI_TO.dimensionality_reduction import *
-
-    #-----------------------------------------------------------------#
-
-    # Set other paths
-    #path_main = '/Users/IEO5505/Desktop/MI_TO/'
-    path_data = path_main + '/data/'
-    path_distances = path_main + '/results_and_plots/distances/'
-    path_clones = path_main + '/results_and_plots/clones_classification/'
-    path_results = path_main + '/results_and_plots/leiden_clustering/'
-    path_class_performance = path_main + '/results_and_plots/classification_performance/'
-    path_runs = path_main + '/runs/'
-
-    #-----------------------------------------------------------------#
-
-    # Set logger 
-    logger = set_logger(path_runs, f'leiden.txt')
+    from sklearn.metrics import normalized_mutual_info_score
+    from mito_utils.utils import *
+    from mito_utils.preprocessing import *
+    from mito_utils.dimred import *
+    from mito_utils.clustering import *
+    from mito_utils.kNN import *
+    from mito_utils.dimred import *
+ 
+    # Set logger
+    path = os.getcwd() 
+    logger = set_logger(
+        path, 
+        f'log_{sample}_{filtering}_{dimred}_{min_cell_number}_{k}.txt'
+    )
 
 ########################################################################
 
@@ -104,82 +173,116 @@ def main():
 
     # Load data
     t = Timer()
+    t.start()
 
+    logger.info(
+        f""" 
+        Execute clones clustering, leiden: \n
+        --sample {sample} 
+        --filtering {filtering} 
+        --dimred {dimred}
+        --min_cell_number {min_cell_number} 
+        --min_cov_treshold {min_cov_treshold}
+        """
+    )
+    
+    afm = read_one_sample(path_data, sample=sample)
+    ncells0 = afm.shape[0]
+    n_all_clones = len(afm.obs['GBC'].unique())
+    # blacklist = pd.read_csv(path_blacklist, index_col=0)
+
+    ##
+
+    # Filter 'good quality' cells and variants
+    if dimred == 'no_dimred':
+
+        _, a = filter_cells_and_vars(
+            afm,
+            # blacklist=blacklist,
+            sample=sample,
+            filtering=filtering, 
+            min_cell_number=min_cell_number, 
+            min_cov_treshold=min_cov_treshold, 
+            nproc=ncores, 
+            path_=path
+        )
+
+        # Extract X
+        a = nans_as_zeros(a) # For sklearn APIs compatibility
+        ncells = a.shape[0]
+        n_clones_analyzed = len(a.obs['GBC'].unique())
+        X = a.X
+
+    else:
+
+        _, a = filter_cells_and_vars(
+            afm,
+            sample=sample,
+            filtering=filtering, 
+            min_cell_number=min_cell_number, 
+            min_cov_treshold=min_cov_treshold, 
+            nproc=ncores
+        )
+
+        # Extract X
+        a = nans_as_zeros(a) # For sklearn APIs compatibility
+        ncells = a.shape[0]
+        n_clones_analyzed = len(a.obs['GBC'].unique())
+        X, _ = reduce_dimensions(a, method=dimred, n_comps=min(n_comps, a.shape[1]), sqrt=False)
+    
+    ##
+
+    logger.info(f'Reading and formatting AFM, X and y, took total {t.stop()}')
+    logger.info(f'''Total cells and clones in the original QCed sample
+                (perturb seq QC metrics): {ncells0}; {n_all_clones}.''')
+    logger.info(f'''Total cells, clones and features submitted to classification:
+                {ncells}; {n_clones_analyzed}, {X.shape[1]}.''')
+
+    # Here we go
     logger.info(f'Execute leiden clustering...')
-
-    # Read top3 dictionary
-    with open(path_clones + 'top3.pkl', 'rb') as f:
-        top3 = pickle.load(f)
-
-    # Separate clones and analysis 
-    samples = list(top3.keys())
-    top_analysis = [ top3[k][0] for k in top3 ]
     
-    # For each sample and its top analysis...
-    solutions_d = {}
-    connectivities_d = {}
+    # kNN
+    t.start()
+    g = kNN_graph(X, k=k)
+    conn = g[1]
+    logger.info(f'kNN construction: {t.stop()}')
 
-    for i in range(len(samples)): 
+    # Partition and scoring
+    L = []
+    for i, r in enumerate(np.linspace(res_range[0], res_range[1], n)):
 
-        top = top_analysis[i] 
-        sample = samples[i] 
-        cbc_gbc = pd.read_csv(path_data + f'CBC_GBC_cells/CBC_GBC_{sample}.csv', index_col=0)
+        t.start()
+        labels = leiden_clustering(conn, res=r)
+        ari = custom_ARI(labels, a.obs['GBC'])
+        nmi = normalized_mutual_info_score(labels, a.obs['GBC'])
         
-        # Read in a dictionary the distance matrices of its top analysis
-        sol_d = {}
-        conn_d = {}
-        DISTANCES = {
-            x.split('.')[0] : \
-            sc.read(path_distances + x) for x in os.listdir(path_distances) \
-            if bool(re.search('_'.join(top.split('_')[:-1]), x))
-        }
-    
-        # For each distance...
-        for key in DISTANCES:
-            D = DISTANCES[key]
-            cells_ = D.obs_names
-            df_clones = cbc_gbc.loc[cells_, :]
-            true_clones = pd.Categorical(df_clones['GBC'])
+        L.append({
+            'ARI' : ari,
+            'NMI' : nmi,
+            'k' : k, 
+            'resolution' : r,
+            'sample' : sample,
+            'filtering': filtering,
+            'dimred' : dimred,
+            'min_cell_number' : min_cell_number
+        })
+        logger.info(f'Sol {k}_{r}: {t.stop()}')
 
-            logger.info(f'Go with distance {key}...')
-            t.start()
+    # Write 
+    (
+        pd.DataFrame(L)
+        .sort_values('ARI')
+        .to_csv(f'out_{sample}_{filtering}_{dimred}_{min_cell_number}_{k}.csv')
+    )
 
-            # Compute kNN graphs... 
-            for k in [5, 15, 30, 50, 100]:
-                kNN = kNN_graph(D.X, k=k)
-                conn = kNN['connectivities']
-                conn_d[key] = conn                 
-
-                # Partition them with different resolutions, and calculate ARI with ground truth
-                for res in np.linspace(res_range[0], res_range[1], 5):
-                    labels = leiden_clustering(conn, res=res)
-                    ari = custom_ARI(labels, true_clones)
-                    sol_d[f'{key}|{k}|{res}'] = (labels, true_clones, ari)
-
-            logger.info(f'Finished with distance matrix {key}: {t.stop()}')
-
-        solutions_d[sample] = sol_d
-        connectivities_d[sample] = conn_d
-
-
-    # Save dictionaries
-    with open(path_results + 'solutions.pkl', 'wb') as f:
-        pickle.dump(solutions_d, f)
-
-    with open(path_results + 'connectivities.pkl', 'wb') as f:
-        pickle.dump(connectivities_d, f)
-                    
     #-----------------------------------------------------------------#
 
-    # Write final exec time
+    # Exec
     logger.info(f'Execution was completed successfully in total {T.stop()} s.')
 
-#######################################################################
 
-# Run program
+########################################################################   
+
 if __name__ == "__main__":
-    if not args.skip:
-        main()
-
-#######################################################################
+    main()
 

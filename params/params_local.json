@@ -1,0 +1,13 @@
+{
+    "path_data" : "/Users/IEO5505/Desktop/example_mito/data/",
+    "outdir" : "/Users/IEO5505/Desktop/example_mito/results/unsupervised_clones/output/",
+    "min_cov_treshold" : 50,
+    "n_combos" : 100,
+    "samples" : ["AML_clones"],
+    "filtering" : ["miller2022", "pegasus"],
+    "dimred" : ["no_dimred", "PCA", "UMAP"],
+    "min_cell_number" : [5],
+    "k" : [5, 10, 15, 30, 50, 100],
+    "resolution_range" : "0.2:2.0",
+    "n" : 10
+} 
