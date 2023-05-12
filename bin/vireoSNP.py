@@ -12,7 +12,7 @@ from mito_utils.utils import *
 from mito_utils.preprocessing import *
 from mito_utils.dimred import *
 from mito_utils.clustering import *
-from vireoSNP import BinomMixtureVB
+import vireoSNP
 from vireoSNP.plot import heat_matrix
 from matplotlib import cm
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
@@ -128,7 +128,7 @@ def main():
 
         _ELBO_mat = []
         for k in n_clone_list:
-            _model = BinomMixtureVB(n_var=AD.shape[0], n_cell=AD.shape[1], n_donor=k)
+            _model = vireoSNP.BinomMixtureVB(n_var=AD.shape[0], n_cell=AD.shape[1], n_donor=k)
             _model.fit(AD, DP, min_iter=30, n_init=n_init)
             _ELBO_mat.append(_model.ELBO_inits)
 
@@ -149,7 +149,7 @@ def main():
     if chosen is not None:
 
         # Last fit
-        _model = BinomMixtureVB(n_var=AD.shape[0], n_cell=AD.shape[1], n_donor=chosen)
+        _model = vireoSNP.BinomMixtureVB(n_var=AD.shape[0], n_cell=AD.shape[1], n_donor=chosen)
         _model.fit(AD, DP, min_iter=30, n_init=50)
 
         ##
