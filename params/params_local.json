@@ -1,6 +1,7 @@
 {
-    "path_data" : "/Users/IEO5505/Desktop/example_mito/data/",
-    "outdir" : "/Users/IEO5505/Desktop/example_mito/results/unsupervised_clones/output/",
+    "path_data" : "/Users/IEO5505/Desktop/mito_bench/data/",
+    "outdir_lineage" : "/Users/IEO5505/Desktop/example_mito/results/unsupervised_clones/output_lineage/",
+    "outdir_leiden" : "/Users/IEO5505/Desktop/example_mito/results/unsupervised_clones/output_leiden/",
     "min_cov_treshold" : 50,
     "n_combos" : 100,
     "samples" : ["AML_clones"],
@@ -9,5 +10,8 @@
     "min_cell_number" : [5],
     "k" : [5, 10, 15, 30, 50, 100],
     "resolution_range" : "0.2:2.0",
-    "n" : 10
+    "n" : 10,
+    "leiden" : false,
+    "lineage" : true,
+    "lineage_iters" : 2
 } 

@@ -7,7 +7,7 @@ nextflow.enable.dsl = 2
 process LEIDEN {
 
     tag "${sample}_${filtering}_${dimred}_${min_cell_number}_${k}"
-    publishDir "${params.outdir}/", mode: 'copy'
+    publishDir "${params.outdir_leiden}/", mode: 'copy'
 
     input:
     tuple val(sample), 
@@ -23,16 +23,16 @@ process LEIDEN {
     script:
     """
     python ${baseDir}/bin/leiden_clustering.py \
-        --min_cov_treshold ${params.min_cov_treshold} \
-        --ncores ${task.cpus} \
-        --p ${params.path_data} \
-        --sample ${sample} \
-        --filtering ${filtering} \
-        --dimred ${dimred} \
-        --min_cell_number ${min_cell_number} \
-        --range ${params.resolution_range} \
-        --k ${k} \
-        --n ${params.n}
+    --min_cov_treshold ${params.min_cov_treshold} \
+    --ncores ${task.cpus} \
+    --p ${params.path_data} \
+    --sample ${sample} \
+    --filtering ${filtering} \
+    --dimred ${dimred} \
+    --min_cell_number ${min_cell_number} \
+    --range ${params.resolution_range} \
+    --k ${k} \
+    --n ${params.n}
     """
 
     stub:
