@@ -12,7 +12,7 @@ from mito_utils.utils import *
 from mito_utils.preprocessing import *
 from mito_utils.dimred import *
 from mito_utils.clustering import *
-import vireoSNP import BinomMixtureVB
+from vireoSNP import BinomMixtureVB
 from vireoSNP.plot import heat_matrix
 from matplotlib import cm
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
