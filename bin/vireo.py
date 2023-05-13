@@ -54,11 +54,20 @@ my_parser.add_argument(
     help='Chosen n of clones.'
 )
 
+# ncores
+my_parser.add_argument(
+    '--ncores', 
+    type=int,
+    default=None,
+    help='n cores.'
+)
+
 # Parse arguments
 args = my_parser.parse_args()
 
 path_main = args.path_main
 sample = args.sample
+ncores = args.ncores
 chosen = args.chosen
 
 ####################################################################
@@ -70,7 +79,6 @@ path_results = os.path.join(path_main, 'results', 'vireoSNP')
 # Default args here
 filtering = 'MQuad'
 min_cov_treshold = 50
-ncores = 10
 p_treshold = 0.8
 
 ##
@@ -99,7 +107,7 @@ def main():
         # blacklist=blacklist,
         sample=sample,
         filtering=filtering, 
-        min_cov_treshold=min_cov_treshold, 
+        min_cov_treshold=min_cov_treshold,
         nproc=ncores, 
         path_=os.path.join(path_results, sample)
     )
@@ -109,7 +117,7 @@ def main():
     ncells = a.shape[0]
 
     # UMAP MT-SNVs
-    embs, _ = reduce_dimensions(a, method='UMAP', n_comps=min(30, a.shape[1]), sqrt=False)
+    embs, _ = reduce_dimensions(a, method='UMAP', n_comps=2, sqrt=False)
     (
         pd.DataFrame(embs, index=a.obs_names, columns=['UMAP1', 'UMAP2'])
         .to_csv(os.path.join(path_results, sample, 'MT_SNVs_umap.csv'))
