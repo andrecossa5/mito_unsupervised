@@ -85,7 +85,7 @@ def main():
     T.start()
 
     make_folder(path_results, sample, overwrite=True)
-    logger = set_logger(os.path.join(path_results, sample, f'log.txt'))
+    logger = set_logger(os.path.join(path_results, sample), 'log.txt')
     
     # Read data
     afm = read_one_sample(path_data, sample=sample, with_GBC=False)
