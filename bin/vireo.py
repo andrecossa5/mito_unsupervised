@@ -97,7 +97,7 @@ sample = args.sample
 ncores = args.ncores
 chosen = args.chosen
 start, stop = args.range.split(':')
-range_clones = np.arange(start, stop)
+range_clones = np.arange(int(start), int(stop))
 GBC =  args.GBC
 
 # Default
@@ -138,7 +138,7 @@ def main():
         # blacklist=blacklist,
         sample=sample,
         filtering=filtering, 
-        min_cell_number=10,
+        min_cell_number=0 if not GBC else 10,
         min_cov_treshold=min_cov_treshold,
         nproc=ncores, 
         path_=os.path.join(path_results, sample)
@@ -171,7 +171,7 @@ def main():
         x = range_clones
         y = np.median(_ELBO_mat, axis=1)
         knee = KneeLocator(x, y).find_knee()[0]
-        chosen = knee
+        n_clones = knee
 
         # Show ELBO trend with knee
         df_ = (
@@ -197,7 +197,7 @@ def main():
     ##
 
     # Identify clones
-    _model = BinomMixtureVB(n_var=AD.shape[0], n_cell=AD.shape[1], n_donor=chosen)
+    _model = BinomMixtureVB(n_var=AD.shape[0], n_cell=AD.shape[1], n_donor=n_clones)
     _model.fit(AD, DP, min_iter=30, n_init=50)
 
     ##
