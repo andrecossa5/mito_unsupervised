@@ -8,19 +8,7 @@
 import argparse
 import os
 
-from kneed import KneeLocator
-from sklearn.metrics import normalized_mutual_info_score
-from mito_utils.utils import *
-from mito_utils.preprocessing import *
-from mito_utils.plotting_base import *
-from mito_utils.embeddings_plots import *
-from mito_utils.dimred import *
-from mito_utils.clustering import *
-from vireoSNP import BinomMixtureVB
-
-
 ##
-
 
 # Create the parser
 my_parser = argparse.ArgumentParser(
@@ -55,19 +43,51 @@ my_parser.add_argument(
     help='Range of n_clones to search from. Default: 2:15.'
 )
 
-# GBC
-my_parser.add_argument(
-    '--GBC', 
-    action='store_true',
-    help='Read and use GBC information. Default: False.'
-)
-
 # Chosen 
 my_parser.add_argument(
     '--chosen', 
     type=int,
     default=None,
     help='Chosen n of clones, overrides automatic identification via findknee.'
+)
+
+# Range n
+my_parser.add_argument(
+    '--filtering', 
+    type=str,
+    default='MQuad',
+    help='Method to filter variants from the AFM. Default: 2:15.'
+)
+
+# min_cov_treshold
+my_parser.add_argument(
+    '--min_cov_treshold', 
+    type=int,
+    default=50,
+    help='min_cov_treshold.'
+)
+
+# min_cell_number
+my_parser.add_argument(
+    '--min_cell_number', 
+    type=int,
+    default=0,
+    help='min_cell_number treshold.'
+)
+
+# min_cell_number
+my_parser.add_argument(
+    '--p_treshold', 
+    type=float,
+    default=0.8,
+    help='Treshold use to convert clonal assignment to crisp labels.'
+)
+
+# GBC
+my_parser.add_argument(
+    '--GBC', 
+    action='store_true',
+    help='Read and use GBC information. Default: False.'
 )
 
 # ncores
@@ -81,32 +101,52 @@ my_parser.add_argument(
 # Parse arguments
 args = my_parser.parse_args()
 
+
+##
+
 # path_main = '/Users/IEO5505/Desktop/mito_bench/'
 # sample = 'MDA_clones'
-# ncores = 4
-# chosen = None
 # range_clones = np.arange(2, 15)
-# GBC = False
+# chosen = None
 # filtering = 'MQuad'
 # min_cov_treshold = 50
-# dimred
+# min_cell_number = 10
 # p_treshold = 0.8
+# GBC = True
+# ncores = 4
+
+##
 
 path_main = args.path_main
 sample = args.sample
-ncores = args.ncores
-chosen = args.chosen
 start, stop = args.range.split(':')
-range_clones = np.arange(int(start), int(stop))
+range_clones = range(int(start), int(stop))
+chosen = args.chosen
+filtering = args.filtering
+min_cov_treshold = args.min_cov_treshold
+min_cell_number = args.min_cell_number
+p_treshold = args.p_treshold
 GBC =  args.GBC
+ncores = args.ncores
 
-# Default
-filtering = 'MQuad'
-min_cov_treshold = 50
-dimred = 'no_dimred'
-p_treshold = 0.8
+
+##
+
 
 ####################################################################
+
+# Preparing run: import code, set paths
+
+# Code
+from kneed import KneeLocator
+from sklearn.metrics import normalized_mutual_info_score
+from mito_utils.utils import *
+from mito_utils.preprocessing import *
+from mito_utils.plotting_base import *
+from mito_utils.embeddings_plots import *
+from mito_utils.dimred import *
+from mito_utils.clustering import *
+from vireoSNP import BinomMixtureVB
 
 # Paths 
 path_data = os.path.join(path_main, 'data')
@@ -117,14 +157,33 @@ path_results = os.path.join(path_main, 'results', 'unsupervised_clones', 'vireo'
 # Main
 def main():
 
-    # Move to vireoSNP directory
+    # Load data
     T = Timer()
     T.start()
+    
+    t = Timer()
 
+    # Create folder
     make_folder(path_results, sample, overwrite=True)
     logger = set_logger(os.path.join(path_results, sample), 'log.txt')
     
+    # Set logger
+    logger.info(
+        f""" 
+        Execute clones unsupervised, vireoSNP: \n
+        --sample {sample} 
+        --filtering {filtering} 
+        --min_cell_number {min_cell_number} 
+        --min_cov_treshold {min_cov_treshold}
+        --p_treshold {p_treshold}
+        """
+    )
+    
+    ##
+    
     # Read data
+    t.start()
+    
     if GBC:
         afm = read_one_sample(path_data, sample=sample, with_GBC=True)
         n_all_clones = len(afm.obs['GBC'].unique())
@@ -132,13 +191,11 @@ def main():
         afm = read_one_sample(path_data, sample=sample, with_GBC=False)
 
     # Filter cells and vars, create a mutational embedding
-    ncells0 = afm.shape[0]
     _, a = filter_cells_and_vars(
         afm,
-        # blacklist=blacklist,
         sample=sample,
         filtering=filtering, 
-        min_cell_number=0 if not GBC else 10,
+        min_cell_number=0 if not GBC else min_cell_number,
         min_cov_treshold=min_cov_treshold,
         nproc=ncores, 
         path_=os.path.join(path_results, sample)
@@ -146,7 +203,6 @@ def main():
 
     # Extract filtered feature matrix, format and reduce with UMAP
     a = nans_as_zeros(a) # For sklearn APIs compatibility
-    ncells = a.shape[0]
 
     # UMAP MT-SNVs
     embs, _ = reduce_dimensions(a, method='UMAP', n_comps=2, sqrt=False)
@@ -155,23 +211,32 @@ def main():
 
     # Get parallel matrices
     AD, DP, _ = get_AD_DP(a, to='csc')
+    
+    logger.info(f'SNVs filtering, UMAP, AD/DP matrix preparation {t.stop()}')
 
     ##
 
     # Choose k
     if chosen is None:
 
+        t.start()
+        logger.info(f'Start inference...')
+         
         _ELBO_mat = []
         for k in range_clones:
             _model = BinomMixtureVB(n_var=AD.shape[0], n_cell=AD.shape[1], n_donor=k)
             _model.fit(AD, DP, min_iter=30, max_iter=500, max_iter_pre=250, n_init=50, random_seed=1234)
             _ELBO_mat.append(_model.ELBO_inits)
         
+        logger.info(f'Finished inference: {t.stop()}')
+        
         # Find knee
         x = range_clones
         y = np.median(_ELBO_mat, axis=1)
         knee = KneeLocator(x, y).find_knee()[0]
         n_clones = knee
+        
+        logger.info(f'Found knee at {n_clones} n_clones')
 
         # Show ELBO trend with knee
         df_ = (
@@ -193,12 +258,18 @@ def main():
 
         # Save
         fig.savefig(os.path.join(path_results, sample, 'ELBO.png'))
+    
+    else:
+        n_clones = chosen
+        logger.info(f'n_clones supplied: {n_clones}')
 
     ##
 
     # Identify clones
+    t.start()
+        
     _model = BinomMixtureVB(n_var=AD.shape[0], n_cell=AD.shape[1], n_donor=n_clones)
-    _model.fit(AD, DP, min_iter=30, n_init=50)
+    _model.fit(AD, DP, min_iter=30, n_init=50, max_iter=500, max_iter_pre=250, random_seed=1234)
 
     ##
     
@@ -219,18 +290,40 @@ def main():
             labels.append(np.where(cell_ass>p_treshold)[0][0])
         except:
             labels.append('unassigned')
+            
+    logger.info(f'Cells assigned to clones: {t.stop()}')
     
     # Score if necessary      
     if GBC:
+        
+        # Score
         ground_truth = a.obs['GBC'].astype('str')
         ARI = custom_ARI(ground_truth, labels)
         NMI = normalized_mutual_info_score(ground_truth, labels)
-
-        # Save labels
-        print(np.unique(labels, return_counts=True))
-        labels = pd.Series(labels, index=a.obs_names)
-        labels.to_csv(os.path.join(path_results, sample, 'labels.csv'))
-               
+        
+        # Produce and save report dictionary
+        (
+            pd.Series({
+                'sample' : sample,
+                'filtering' : filtering, 
+                'min_cell_number' : min_cell_number,
+                'min_cov_treshold' : min_cov_treshold,
+                'ncells_sample' : a.shape[0],
+                'n_ground_truth' : len(np.unique(ground_truth)),
+                'n_labels' : len(np.unique(labels)),
+                'n_features' : a.shape[1],
+                'model' : 'vireoSNP',
+                'ARI' : ARI,
+                'NMI' : NMI
+            })
+            .to_frame().T
+            .to_csv(os.path.join(path_results, sample, f'results.csv'))
+        )
+        
+    # Save labels
+    labels = pd.Series(labels, index=a.obs_names)
+    labels.to_csv(os.path.join(path_results, sample, 'labels.csv'))
+                   
     # Exit
     logger.info(f'Execution was completed successfully in total {T.stop()} s.')
 
