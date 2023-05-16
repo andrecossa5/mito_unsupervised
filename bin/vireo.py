@@ -150,7 +150,7 @@ from vireoSNP import BinomMixtureVB
 
 # Paths 
 path_data = os.path.join(path_main, 'data')
-path_results = os.path.join(path_main, 'results', 'unsupervised_clones', 'vireo')
+path_results = os.path.join(path_main, 'results', 'vireo')
 
 ####################################################################
 
