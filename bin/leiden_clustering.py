@@ -87,14 +87,6 @@ my_parser.add_argument(
     help='Include in the analysis only cells MAESTER sites mean coverage > min_cov_treshold. Default: 50.'
 )
 
-# Score
-# my_parser.add_argument(
-#     '--blacklist', 
-#     type=str,
-#     default='.',
-#     help='Path to variant blacklist file. Default: ..'
-# )
-
 # Resolution range
 my_parser.add_argument(
     '--range', 
@@ -136,7 +128,6 @@ filtering = args.filtering if dimred == 'no_dimred' else 'pegasus'
 min_cell_number = args.min_cell_number
 min_cov_treshold = args.min_cov_treshold
 n_comps = args.n_comps
-# path_blacklist = args.blacklist
 res_range = res_range = [ float(x) for x in args.range.split(':') ]
 ncores = args.ncores
 k = args.k
@@ -148,6 +139,7 @@ n = args.n
 if not args.skip:
 
     # Code
+    import pickle
     from sklearn.metrics import normalized_mutual_info_score
     from mito_utils.utils import *
     from mito_utils.preprocessing import *
@@ -157,10 +149,10 @@ if not args.skip:
     from mito_utils.dimred import *
  
     # Set logger
-    path = os.getcwd() 
+    path_ = os.getcwd()
     logger = set_logger(
-        path, 
-        f'log_{sample}_{filtering}_{dimred}_{min_cell_number}_{k}.txt'
+        path_, 
+        f'log_leiden_{sample}_{filtering}_{dimred}_{min_cell_number}_{k}.txt'
     )
 
 ########################################################################
@@ -177,7 +169,7 @@ def main():
 
     logger.info(
         f""" 
-        Execute clones clustering, leiden: \n
+        Execute leiden clustering: \n
         --sample {sample} 
         --filtering {filtering} 
         --dimred {dimred}
@@ -186,10 +178,9 @@ def main():
         """
     )
     
-    afm = read_one_sample(path_data, sample=sample)
+    afm = read_one_sample(path_data, sample=sample, with_GBC=True)
     ncells0 = afm.shape[0]
     n_all_clones = len(afm.obs['GBC'].unique())
-    # blacklist = pd.read_csv(path_blacklist, index_col=0)
 
     ##
 
@@ -198,7 +189,6 @@ def main():
 
         _, a = filter_cells_and_vars(
             afm,
-            # blacklist=blacklist,
             sample=sample,
             filtering=filtering, 
             min_cell_number=min_cell_number, 
@@ -209,7 +199,9 @@ def main():
 
         # Extract X
         a = nans_as_zeros(a) # For sklearn APIs compatibility
-        ncells = a.shape[0]
+        cells = a.obs_names
+        variants = a.var_names
+        ncells = cells.size
         n_clones_analyzed = len(a.obs['GBC'].unique())
         X = a.X
 
@@ -221,22 +213,17 @@ def main():
             filtering=filtering, 
             min_cell_number=min_cell_number, 
             min_cov_treshold=min_cov_treshold, 
-            nproc=ncores
+            nproc=ncores,
+            path_=path_
         )
 
         # Extract X
         a = nans_as_zeros(a) # For sklearn APIs compatibility
-        ncells = a.shape[0]
+        cells = a.obs_names
+        variants = a.var_names
+        ncells = cells.size
         n_clones_analyzed = len(a.obs['GBC'].unique())
-        X, _ = reduce_dimensions(a, method=dimred, n_comps=min(n_comps, a.shape[1]), sqrt=False)
-    
-    ##
-
-    logger.info(f'Reading and formatting AFM, X and y, took total {t.stop()}')
-    logger.info(f'''Total cells and clones in the original QCed sample
-                (perturb seq QC metrics): {ncells0}; {n_all_clones}.''')
-    logger.info(f'''Total cells, clones and features submitted to classification:
-                {ncells}; {n_clones_analyzed}, {X.shape[1]}.''')
+        X, _ = reduce_dimensions(a, method=dimred, n_comps=min(n_comps, ncells), sqrt=False)
 
     # Here we go
     logger.info(f'Execute leiden clustering...')
@@ -248,33 +235,43 @@ def main():
     logger.info(f'kNN construction: {t.stop()}')
 
     # Partition and scoring
+    gt = a.obs['GBC'].astype('str')
+    labels_d = {}
     L = []
     for i, r in enumerate(np.linspace(res_range[0], res_range[1], n)):
 
         t.start()
         labels = leiden_clustering(conn, res=r)
-        ari = custom_ARI(labels, a.obs['GBC'])
-        nmi = normalized_mutual_info_score(labels, a.obs['GBC'])
+        ari = custom_ARI(labels, gt)
+        nmi = normalized_mutual_info_score(labels, gt)
         
         L.append({
+            'model' : f'leiden_k_{k}_res_{r}',
             'ARI' : ari,
             'NMI' : nmi,
-            'k' : k, 
-            'resolution' : r,
             'sample' : sample,
             'filtering': filtering,
             'dimred' : dimred,
-            'min_cell_number' : min_cell_number
+            'min_cell_number' : min_cell_number,
+            'min_cov_treshold' : min_cov_treshold,
+            'ncells_sample' : gt.size,
+            'n_clones_analyzed' : gt.unique().size,
+            'n_clones_inferred' : np.unique(labels).size,
+            'n_variants' : a.shape[1] if dimred != 'no_dimred' else 'reduced_dim',
         })
+        labels_d[r] = labels
         logger.info(f'Sol {k}_{r}: {t.stop()}')
 
     # Write 
-    (
-        pd.DataFrame(L)
-        .sort_values('ARI')
-        .to_csv(f'out_{sample}_{filtering}_{dimred}_{min_cell_number}_{k}.csv')
-    )
-
+    df = pd.DataFrame(L).sort_values('NMI')
+    d = {
+        'df_performance' : df,
+        'labels' : labels_d
+    }
+    path_results = f'out_leiden_{sample}_{filtering}_{dimred}_{min_cell_number}_{k}.pickle'
+    with open(path_results, 'wb') as f:
+        pickle.dump(d, f)
+    
     #-----------------------------------------------------------------#
 
     # Exec
@@ -285,4 +282,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

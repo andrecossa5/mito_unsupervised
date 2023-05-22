@@ -9,10 +9,10 @@ process LINEAGE {
     tag "${sample}"
 
     input:
-    tuple val(sample), path(afm), path(meta)
+    tuple val(sample), val(min_cell_number), path(afm), path(meta)
 
     output:
-    tuple val(sample), path("ground_truth.csv"), path("lineage_labels.csv"), emit: labels
+    tuple val(sample), val(min_cell_number), path("ground_truth.csv"), path("lineage_labels.csv"), emit: labels
     
     script:
     """

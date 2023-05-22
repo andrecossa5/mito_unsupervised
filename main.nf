@@ -1,7 +1,6 @@
-// MI_TO pipeline
+// mito_unsupervised pipeline
 nextflow.enable.dsl = 2
-include { clustering_clones } from "./subworkflows/clones/main"
-// include { classification_samples } from "./subworkflows/samples/main"
+include { infer_clones } from "./subworkflows/clones/main"
 
 // Samples channel
 ch_samples = Channel
@@ -18,19 +17,12 @@ ch_samples = Channel
 
 workflow clones {
 
-    clustering_clones(ch_samples)
-    clustering_clones.out.job_output.view()
+    infer_clones(ch_samples)
+    infer_clones.out.job_output.view()
 
 }
 
 //
-
-// workflow samples {
-// 
-//     classification_samples(ch_samples)
-//     classification_samples.out.summary.view()
-// 
-// }
 
 // Mock
 workflow  {

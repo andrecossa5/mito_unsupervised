@@ -9,10 +9,10 @@ process PREP_LINEAGE {
     tag "${sample}"
 
     input:
-    val(sample)
+    tuple val(sample), val(min_cell_number)
 
     output:
-    tuple val(sample), path("formatted.csv"), path("meta.csv"), emit: complete_matrix
+    tuple val(sample), val(min_cell_number), path("formatted.csv"), path("meta.csv"), emit: complete_matrix
     
     script:
     """

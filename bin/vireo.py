@@ -21,10 +21,10 @@ my_parser = argparse.ArgumentParser(
 # Path_main
 my_parser.add_argument(
     '-p', 
-    '--path_main', 
+    '--path_data', 
     type=str,
     default='..',
-    help='Path to project dir. Default: .. .'
+    help='Path input file. Default: .. .'
 )
 
 # Sample
@@ -83,13 +83,6 @@ my_parser.add_argument(
     help='Treshold use to convert clonal assignment to crisp labels.'
 )
 
-# GBC
-my_parser.add_argument(
-    '--GBC', 
-    action='store_true',
-    help='Read and use GBC information. Default: False.'
-)
-
 # ncores
 my_parser.add_argument(
     '--ncores', 
@@ -104,20 +97,7 @@ args = my_parser.parse_args()
 
 ##
 
-# path_main = '/Users/IEO5505/Desktop/mito_bench/'
-# sample = 'MDA_clones'
-# range_clones = np.arange(2, 15)
-# chosen = None
-# filtering = 'MQuad'
-# min_cov_treshold = 50
-# min_cell_number = 10
-# p_treshold = 0.8
-# GBC = True
-# ncores = 4
-
-##
-
-path_main = args.path_main
+path_data = args.path_main
 sample = args.sample
 start, stop = args.range.split(':')
 range_clones = range(int(start), int(stop))
@@ -126,8 +106,20 @@ filtering = args.filtering
 min_cov_treshold = args.min_cov_treshold
 min_cell_number = args.min_cell_number
 p_treshold = args.p_treshold
-GBC =  args.GBC
 ncores = args.ncores
+
+# path_data = '/Users/IEO5505/Desktop/MI_TO/scratch/data/'
+# path_ = os.getcwd()
+# sample = 'AML_clones'
+# 
+# start, stop = '2:10'.split(':')
+# range_clones = range(int(start), int(stop))
+# filtering = 'MQuad'
+# min_cov_treshold = 50
+# min_cell_number = 10
+# p_treshold = 0.8
+# GBC = False
+# ncores = 8
 
 
 ##
@@ -148,10 +140,6 @@ from mito_utils.dimred import *
 from mito_utils.clustering import *
 from vireoSNP import BinomMixtureVB
 
-# Paths 
-path_data = os.path.join(path_main, 'data')
-path_results = os.path.join(path_main, 'results', 'vireo')
-
 ####################################################################
 
 # Main
@@ -163,14 +151,14 @@ def main():
     
     t = Timer()
 
-    # Create folder
-    make_folder(path_results, sample, overwrite=True)
-    logger = set_logger(os.path.join(path_results, sample), 'log.txt')
+    # Logging
+    path_ = os.getcwd()
+    logger = set_logger(path_, f'{sample}_log.txt')
     
     # Set logger
     logger.info(
         f""" 
-        Execute clones unsupervised, vireoSNP: \n
+        Execute vireoSNP: \n
         --sample {sample} 
         --filtering {filtering} 
         --min_cell_number {min_cell_number} 
@@ -183,94 +171,50 @@ def main():
     
     # Read data
     t.start()
-    
-    if GBC:
-        afm = read_one_sample(path_data, sample=sample, with_GBC=True)
-        n_all_clones = len(afm.obs['GBC'].unique())
-    else:
-        afm = read_one_sample(path_data, sample=sample, with_GBC=False)
+    afm = read_one_sample(path_data, sample=sample, with_GBC=True)
 
     # Filter cells and vars, create a mutational embedding
     _, a = filter_cells_and_vars(
         afm,
         sample=sample,
         filtering=filtering, 
-        min_cell_number=0 if not GBC else min_cell_number,
+        min_cell_number=min_cell_number,
         min_cov_treshold=min_cov_treshold,
         nproc=ncores, 
-        path_=os.path.join(path_results, sample)
+        path_=path_
     )
 
     # Extract filtered feature matrix, format and reduce with UMAP
     a = nans_as_zeros(a) # For sklearn APIs compatibility
 
-    # UMAP MT-SNVs
-    embs, _ = reduce_dimensions(a, method='UMAP', n_comps=2, sqrt=False)
-    embs = pd.DataFrame(embs, index=a.obs_names, columns=['UMAP1', 'UMAP2'])
-    embs.to_csv(os.path.join(path_results, sample, 'MT_SNVs_umap.csv'))
-
     # Get parallel matrices
     AD, DP, _ = get_AD_DP(a, to='csc')
-    
     logger.info(f'SNVs filtering, UMAP, AD/DP matrix preparation {t.stop()}')
 
     ##
 
     # Choose k
-    if chosen is None:
-
-        t.start()
-        logger.info(f'Start inference...')
-         
-        _ELBO_mat = []
-        for k in range_clones:
-            _model = BinomMixtureVB(n_var=AD.shape[0], n_cell=AD.shape[1], n_donor=k)
-            _model.fit(AD, DP, min_iter=30, max_iter=500, max_iter_pre=250, n_init=50, random_seed=1234)
-            _ELBO_mat.append(_model.ELBO_inits)
-        
-        logger.info(f'Finished inference: {t.stop()}')
-        
-        # Find knee
-        x = range_clones
-        y = np.median(_ELBO_mat, axis=1)
-        knee = KneeLocator(x, y).find_knee()[0]
-        n_clones = knee
-        
-        logger.info(f'Found knee at {n_clones} n_clones')
-
-        # Show ELBO trend with knee
-        df_ = (
-            pd.DataFrame(np.array(_ELBO_mat), index=range_clones)
-            .reset_index()
-            .rename(columns={'index':'n_clones'})
-            .melt(id_vars='n_clones', var_name='run', value_name='ELBO')
-        )    
-        df_['n_clones'] = df_['n_clones'].astype(str)
-         
-        # Fig
-        fig, ax = plt.subplots(figsize=(8, 5))
-        ax.plot(df_.groupby('n_clones').agg('median')['ELBO'].sort_values(), 'o--')
-        ax.vlines(str(knee), df_['ELBO'].min(), df_['ELBO'].max())
-        box(df_, 'n_clones', 'ELBO', c='#E9E7E7', ax=ax)
-        format_ax(ax, xlabel='n clones', ylabel='ELBO')
-        ax.text(.8, .1, f'knee: {knee}', transform=ax.transAxes)
-        ax.spines[['right', 'top']].set_visible(False)
-
-        # Save
-        fig.savefig(os.path.join(path_results, sample, 'ELBO.png'))
-    
-    else:
-        n_clones = chosen
-        logger.info(f'n_clones supplied: {n_clones}')
-
-    ##
-
-    # Identify clones
     t.start()
-        
+    logger.info(f'Start inference...')
+
+    _ELBO_mat = []
+    for k in range_clones:
+        _model = BinomMixtureVB(n_var=AD.shape[0], n_cell=AD.shape[1], n_donor=k)
+        _model.fit(AD, DP, min_iter=30, max_iter=500, max_iter_pre=250, n_init=50, random_seed=1234)
+        _ELBO_mat.append(_model.ELBO_inits)
+    logger.info(f'Finished inference: {t.stop()}')
+    
+    # Find n_clones
+    t.start()
+    x = range_clones
+    y = np.median(_ELBO_mat, axis=1)
+    knee = KneeLocator(x, y).find_knee()[0]
+    n_clones = knee
+    
+    # Refit with optimal n_clones
     _model = BinomMixtureVB(n_var=AD.shape[0], n_cell=AD.shape[1], n_donor=n_clones)
     _model.fit(AD, DP, min_iter=30, n_init=50, max_iter=500, max_iter_pre=250, random_seed=1234)
-
+    
     ##
     
     # Clonal assignment probabilites --> to crisp labels
@@ -280,7 +224,6 @@ def main():
         index=a.obs_names, 
         columns=range(clonal_assignment.shape[1])
     )
-    df_ass.to_csv(os.path.join(path_results, sample, 'cell_assignments.csv'))
 
     # Define labels
     labels = []
@@ -291,38 +234,34 @@ def main():
         except:
             labels.append('unassigned')
             
-    logger.info(f'Cells assigned to clones: {t.stop()}')
-    
-    # Score if necessary      
-    if GBC:
+    logger.info(f'Cells assigned to {len(labels)} clones: {t.stop()}')
         
-        # Score
-        ground_truth = a.obs['GBC'].astype('str')
-        ARI = custom_ARI(ground_truth, labels)
-        NMI = normalized_mutual_info_score(ground_truth, labels)
+    # Score
+    gt = a.obs['GBC'].astype('str')
+    L = []
+    ari = custom_ARI(labels, gt)
+    nmi = normalized_mutual_info_score(labels, gt)
+
+    L.append({
+        'model' : 'vireoSNP',
+        'ARI' : ari,
+        'NMI' : nmi,
+        'sample' : sample,
+        'filtering': filtering,
+        'dimred' : 'no_dimred',
+        'min_cell_number' : 10,
+        'min_cov_treshold' : 50,
+        'ncells_sample' : gt.size,
+        'n_clones_analyzed' : gt.unique().size,
+        'n_clones_inferred' : np.unique(labels).size,
+        'n_variants' : a.shape[0]
+    })
         
-        # Produce and save report dictionary
-        (
-            pd.Series({
-                'sample' : sample,
-                'filtering' : filtering, 
-                'min_cell_number' : min_cell_number,
-                'min_cov_treshold' : min_cov_treshold,
-                'ncells_sample' : a.shape[0],
-                'n_ground_truth' : len(np.unique(ground_truth)),
-                'n_labels' : len(np.unique(labels)),
-                'n_features' : a.shape[1],
-                'model' : 'vireoSNP',
-                'ARI' : ARI,
-                'NMI' : NMI
-            })
-            .to_frame().T
-            .to_csv(os.path.join(path_results, sample, f'results.csv'))
-        )
-        
-    # Save labels
-    labels = pd.Series(labels, index=a.obs_names)
-    labels.to_csv(os.path.join(path_results, sample, 'labels.csv'))
+    # Write
+    df = pd.DataFrame(L).sort_values('NMI')
+    d = {'df_performance' : df, 'labels' : labels}
+    with open(f'out_vireoSNP_{sample}.pickle', 'wb') as f:
+        pickle.dump(d, f)
                    
     # Exit
     logger.info(f'Execution was completed successfully in total {T.stop()} s.')

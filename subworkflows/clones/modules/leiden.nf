@@ -1,4 +1,4 @@
-// JOB module
+// Leiden module
 
 nextflow.enable.dsl = 2
 
@@ -6,8 +6,8 @@ nextflow.enable.dsl = 2
 
 process LEIDEN {
 
-    tag "${sample}_${filtering}_${dimred}_${min_cell_number}_${k}"
-    publishDir "${params.outdir_leiden}/", mode: 'copy'
+    tag "${sample}_${filtering}_${dimred}_${k}_${min_cell_number}"
+    publishDir "${params.outdir}/", mode: 'copy'
 
     input:
     tuple val(sample), 
@@ -17,8 +17,8 @@ process LEIDEN {
         val(k)
 
     output:
-    path "out_${sample}_${filtering}_${dimred}_${min_cell_number}_${k}.csv", emit: output
-    path "log_${sample}_${filtering}_${dimred}_${min_cell_number}_${k}.txt", emit: logs
+    path "out_leiden_${sample}_${filtering}_${dimred}_${k}_${min_cell_number}.pickle", emit: output
+    path "log_leiden_${sample}_${filtering}_${dimred}_${k}_${min_cell_number}.txt", emit: logs
     
     script:
     """
@@ -37,8 +37,8 @@ process LEIDEN {
 
     stub:
     """
-    touch "out_${sample}_${filtering}_${dimred}_${min_cell_number}_${k}.csv"
-    touch "log_${sample}_${filtering}_${dimred}_${min_cell_number}_${k}.txt"
+    touch "out_leiden_${sample}_${filtering}_${dimred}_${k}_${min_cell_number}.pickle"
+    touch "log_leiden_${sample}_${filtering}_${dimred}_${k}_${min_cell_number}.txt"
     """
 
 }
