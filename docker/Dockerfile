@@ -29,12 +29,12 @@ RUN wget https://github.com/conda-forge/miniforge/releases/latest/download/Mamba
 ENV PATH="/mambaforge/bin/:$PATH"
 
 ## Clone repo and install code
-RUN echo hyperopt added
-RUN git clone https://github.com/andrecossa5/MI_TO.git \
-    && cd MI_TO \
-    && mamba env update -n base -f envs/environment.yml \
+RUN echo mito_utils
+RUN git clone https://github.com/andrecossa5/mito_utils.git \
+    && cd mito_utils \
+    && mamba env update -n base -f envs/environment_mito_utils.yml \
     && mamba develop .. \
-    && mamba develop ../MI_TO/ 
+    && mamba develop ../mito_utils/ 
 
 # RUN pipelines/genomics utils
 RUN apt-get --quiet update --yes \

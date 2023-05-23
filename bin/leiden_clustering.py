@@ -226,6 +226,7 @@ def main():
         X, _ = reduce_dimensions(a, method=dimred, n_comps=min(n_comps, ncells), sqrt=False)
 
     # Here we go
+    logger.info(f'Finished cells and variant selection {t.stop()}')
     logger.info(f'Execute leiden clustering...')
     
     # kNN
