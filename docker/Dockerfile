@@ -48,6 +48,13 @@ RUN mamba install --yes -c bioconda snakemake fgbio
 RUN git clone https://github.com/caleblareau/maegatk.git 
 RUN mamba install --yes -c bioconda bedtools bwa
 
+# Clone tracer packages
+RUN pip install shap circlify
+RUN pip install pyro-ppl==1.7.0 torch==1.9.0
+RUN pip install dill
+COPY ./helper_functions.py /
+RUN cd / && mamba develop /
+
 ## Default command to initialize the container
 CMD [ "bash" ]
 

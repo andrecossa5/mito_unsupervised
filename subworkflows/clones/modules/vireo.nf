@@ -23,12 +23,12 @@ process VIREO {
     python ${baseDir}/bin/vireo.py \
     --min_cov_treshold ${params.min_cov_treshold} \
     --ncores ${task.cpus} \
-    --p ${params.path_data} \
+    -p ${params.path_data} \
     --sample ${sample} \
     --filtering ${filtering} \
     --min_cell_number ${min_cell_number} \
     --range ${params.vireo_clone_range} \
-    --p_treshold ${params.vireo_p_assignment}
+    --p_treshold ${params.vireo_p_assignment} > scam.txt
     """
 
     stub:

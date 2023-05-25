@@ -152,7 +152,7 @@ if not args.skip:
     path_ = os.getcwd()
     logger = set_logger(
         path_, 
-        f'log_leiden_{sample}_{filtering}_{dimred}_{min_cell_number}_{k}.txt'
+        f'log_leiden_{sample}_{filtering}_{dimred}_{k}_{min_cell_number}.txt'
     )
 
 ########################################################################
@@ -194,7 +194,7 @@ def main():
             min_cell_number=min_cell_number, 
             min_cov_treshold=min_cov_treshold, 
             nproc=ncores, 
-            path_=path
+            path_=path_
         )
 
         # Extract X
@@ -265,11 +265,8 @@ def main():
 
     # Write 
     df = pd.DataFrame(L).sort_values('NMI')
-    d = {
-        'df_performance' : df,
-        'labels' : labels_d
-    }
-    path_results = f'out_leiden_{sample}_{filtering}_{dimred}_{min_cell_number}_{k}.pickle'
+    d = {'df_performance' : df, 'labels' : labels_d}
+    path_results = f'out_leiden_{sample}_{filtering}_{dimred}_{k}_{min_cell_number}.pickle'
     with open(path_results, 'wb') as f:
         pickle.dump(d, f)
     

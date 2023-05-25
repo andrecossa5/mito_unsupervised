@@ -97,7 +97,7 @@ args = my_parser.parse_args()
 
 ##
 
-path_data = args.path_main
+path_data = args.path_data
 sample = args.sample
 start, stop = args.range.split(':')
 range_clones = range(int(start), int(stop))
@@ -139,6 +139,8 @@ from mito_utils.embeddings_plots import *
 from mito_utils.dimred import *
 from mito_utils.clustering import *
 from vireoSNP import BinomMixtureVB
+import warnings
+warnings.filterwarnings("ignore")
 
 ####################################################################
 
@@ -153,7 +155,7 @@ def main():
 
     # Logging
     path_ = os.getcwd()
-    logger = set_logger(path_, f'{sample}_log.txt')
+    logger = set_logger(path_, f'log_vireo_{sample}_{filtering}_{min_cell_number}.txt')
     
     # Set logger
     logger.info(
@@ -234,7 +236,7 @@ def main():
         except:
             labels.append('unassigned')
             
-    logger.info(f'Cells assigned to {len(labels)} clones: {t.stop()}')
+    logger.info(f'Cells assigned to {np.unique(labels).size} clones: {t.stop()}')
         
     # Score
     gt = a.obs['GBC'].astype('str')
@@ -254,13 +256,13 @@ def main():
         'ncells_sample' : gt.size,
         'n_clones_analyzed' : gt.unique().size,
         'n_clones_inferred' : np.unique(labels).size,
-        'n_variants' : a.shape[0]
+        'n_variants' : a.shape[1]
     })
         
     # Write
     df = pd.DataFrame(L).sort_values('NMI')
     d = {'df_performance' : df, 'labels' : labels}
-    with open(f'out_vireoSNP_{sample}.pickle', 'wb') as f:
+    with open(f'out_vireo_{sample}_{filtering}_{min_cell_number}.pickle', 'wb') as f:
         pickle.dump(d, f)
                    
     # Exit
