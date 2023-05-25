@@ -1,6 +1,7 @@
 # LINEAGE clustering method
 
 library(tidyverse)
+library(data.table)
 library(LINEAGE)
 
 # Paths
@@ -13,8 +14,8 @@ n_repeats <- args[4]
 n_cores <- args[5]
 
 # Read data
-afm <- read_csv(path_afm) %>% as.data.frame()
-meta <- read_csv(path_meta) %>% as.data.frame()
+afm <- fread(path_afm) %>% as.data.frame()
+meta <- fread(path_meta) %>% as.data.frame()
 
 # Add as row.names
 row.names(afm) <- afm[, 1]
@@ -33,7 +34,7 @@ extract_alt_wt <- function(x) {
 
     return(c(wt, alt))
 }
-alleles <- sapply(var_names, function(x) { extract_alt_wt(x) })
+alleles <- sapply(afm %>% row.names(), function(x) { extract_alt_wt(x) })
 
 ##
 
