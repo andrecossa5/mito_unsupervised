@@ -21,7 +21,7 @@ meta <- fread(path_meta) %>% as.data.frame()
 row.names(afm) <- afm[, 1]
 row.names(meta) <- meta[, 1]
 afm <- afm %>% select(-index) %>% t() # Transpose
-meta <- meta %>% select(-index) %>% head()
+meta <- meta %>% select(-index)
 
 
 ##
@@ -42,6 +42,7 @@ alleles <- sapply(afm %>% row.names(), function(x) { extract_alt_wt(x) })
 afm <- afm %>% as.data.frame() %>% mutate(altAllele=alleles[1,], refAllele=alleles[2,])
 
 # LINEAGE workflow
+afm[is.na(afm)] <- 0 # NA as 0
 results <- lineage(data=afm, repeats=n_repeats, thread=n_cores)
 
 # Format and write results
@@ -52,5 +53,5 @@ labels <- labels %>% select(-cell)
 
 # Write
 gt <- meta %>% select(GBC)
-write.csv(gt, 'ground_truth.csv', sep=',')
-write.csv(labels, 'lineage_labels.csv', sep=',')
+write.csv(gt, 'ground_truth.csv')
+write.csv(labels, 'lineage_labels.csv')
