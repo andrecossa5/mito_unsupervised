@@ -37,7 +37,6 @@ workflow infer_clones {
             
             options = ch_samples
                 .combine(params.min_cell_number)
-                .filter{ it[0] != "MDA_PT" }
             PREP_LINEAGE(options)
             LINEAGE(PREP_LINEAGE.out.complete_matrix)
             SCORE_LINEAGE(LINEAGE.out.labels)
