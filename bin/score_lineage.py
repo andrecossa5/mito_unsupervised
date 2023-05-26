@@ -15,11 +15,14 @@ from mito_utils.preprocessing import *
 sample = sys.argv[1]
 path_ground_truth = sys.argv[2]
 path_labels = sys.argv[3]
-min_cell_number = sys.argv[3]
+min_cell_number = sys.argv[4]
 
 # Read
 gt = pd.read_csv(path_ground_truth, index_col=0)['GBC']
 labels = pd.read_csv(path_labels, index_col=0)['label']
+
+# Subset to common
+gt = gt.loc[labels.index]
 
 # Score
 L = []
