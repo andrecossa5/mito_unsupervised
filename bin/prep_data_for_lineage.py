@@ -14,7 +14,7 @@ sample = sys.argv[2]
 min_cell_number = sys.argv[3]
 
 # Read
-afm = read_one_sample(path_data, sample=sample)
+afm = read_one_sample(path_data, sample=sample, with_GBC=True)
 
 # Filter good quality cells
 a_cells, _ = filter_cells_and_vars(
