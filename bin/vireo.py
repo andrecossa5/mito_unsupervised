@@ -108,17 +108,16 @@ min_cell_number = args.min_cell_number
 p_treshold = args.p_treshold
 ncores = args.ncores
 
-# path_data = '/Users/IEO5505/Desktop/MI_TO/scratch/data/'
+# path_data = '/Users/IEO5505/Desktop/mito_bench/data'
 # path_ = os.getcwd()
-# sample = 'AML_clones'
+# sample = 'MDA_PT'
 # 
-# start, stop = '2:10'.split(':')
+# start, stop = '2:100'.split(':') # 50 stop per PT
 # range_clones = range(int(start), int(stop))
 # filtering = 'MQuad'
 # min_cov_treshold = 50
 # min_cell_number = 10
-# p_treshold = 0.8
-# GBC = False
+# p_treshold = 0.85
 # ncores = 8
 
 
@@ -175,6 +174,12 @@ def main():
     t.start()
     afm = read_one_sample(path_data, sample=sample, with_GBC=True)
 
+    # Get variants for MDA_PT
+    # path_output = os.path.join(path_data, '../results', 'supervised_clones', 'output')
+    # with open(os.path.join(path_output, 'out_MDA_PT_MQuad_no_dimred_xgboost_random_10.pickle'), 'rb') as f:
+    #     d = pickle.load(f)
+    # variants = d['trained_models']['GGTGACCGCCATCCAATG_vs_rest'] ['variants']
+
     # Filter cells and vars, create a mutational embedding
     _, a = filter_cells_and_vars(
         afm,
@@ -182,13 +187,14 @@ def main():
         filtering=filtering, 
         min_cell_number=min_cell_number,
         min_cov_treshold=min_cov_treshold,
+        #variants=variants,
         nproc=ncores, 
         path_=path_
     )
 
     # Extract filtered feature matrix, format and reduce with UMAP
     a = nans_as_zeros(a) # For sklearn APIs compatibility
-
+    
     # Get parallel matrices
     AD, DP, _ = get_AD_DP(a, to='csc')
     logger.info(f'SNVs filtering, UMAP, AD/DP matrix preparation {t.stop()}')
@@ -201,6 +207,7 @@ def main():
 
     _ELBO_mat = []
     for k in range_clones:
+        print(f'Clone n: {k}')
         _model = BinomMixtureVB(n_var=AD.shape[0], n_cell=AD.shape[1], n_donor=k)
         _model.fit(AD, DP, min_iter=30, max_iter=500, max_iter_pre=250, n_init=50, random_seed=1234)
         _ELBO_mat.append(_model.ELBO_inits)
@@ -260,9 +267,14 @@ def main():
     })
         
     # Write
-    df = pd.DataFrame(L).sort_values('NMI')
-    d = {'df_performance' : df, 'labels' : labels}
-    with open(f'out_vireo_{sample}_{filtering}_{min_cell_number}.pickle', 'wb') as f:
+    df = pd.DataFrame(L)
+    d = {'df_performance' : df, 'labels' : pd.Series(labels, index=a.obs_names)}
+    with open(
+        os.path.join(
+            #'/Users/IEO5505/Desktop/mito_bench/results/unsupervised_clones/output',
+            f'out_vireo_{sample}_{filtering}_{min_cell_number}.pickle'
+            ), 'wb'
+        ) as f:
         pickle.dump(d, f)
                    
     # Exit

@@ -16,7 +16,10 @@ process PREP_LINEAGE {
     
     script:
     """
-    python ${baseDir}/bin/prep_data_for_lineage.py ${params.path_data} ${sample}
+    python ${baseDir}/bin/prep_data_for_lineage.py 
+    ${params.path_data} \
+    ${sample} \
+    ${min_cell_number}
     """
 
     stub:
