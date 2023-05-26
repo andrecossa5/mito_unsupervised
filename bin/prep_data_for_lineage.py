@@ -21,7 +21,7 @@ a_cells, _ = filter_cells_and_vars(
     afm,
     sample=sample,
     filtering='LINEAGE_prep',
-    min_cell_number=min_cell_number,
+    min_cell_number=int(min_cell_number),
     min_cov_treshold=50
 )
 
