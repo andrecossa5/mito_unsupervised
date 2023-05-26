@@ -1,7 +1,7 @@
 # LINEAGE clustering method
 
 library(tidyverse)
-library(data.table)
+library(data.table) 
 library(LINEAGE)
 
 # Paths
@@ -43,7 +43,7 @@ afm <- afm %>% as.data.frame() %>% mutate(altAllele=alleles[1,], refAllele=allel
 
 # LINEAGE workflow
 afm[is.na(afm)] <- 0 # NA as 0
-results <- lineage(data=afm, repeats=n_repeats, thread=n_cores)
+results <- lineage(data=afm, repeats=1, thread=NULL)
 
 # Format and write results
 labels <- results$label
