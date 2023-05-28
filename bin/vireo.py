@@ -271,7 +271,7 @@ def main():
     d = {'df_performance' : df, 'labels' : pd.Series(labels, index=a.obs_names)}
     with open(
         os.path.join(
-            #'/Users/IEO5505/Desktop/mito_bench/results/unsupervised_clones/output',
+            # '/Users/IEO5505/Desktop/mito_bench/results/unsupervised_clones/output',
             f'out_vireo_{sample}_{filtering}_{min_cell_number}.pickle'
             ), 'wb'
         ) as f:
