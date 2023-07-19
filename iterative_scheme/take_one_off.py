@@ -121,7 +121,7 @@ if not args.skip:
     path_ = os.path.join(path_, 'logs')
     logger = set_logger(
         path_, 
-        f'logs_iterative_{sample}_{filtering}_{n_muts}.txt'
+        f'logs_take_one_off_{sample}_{filtering}_{n_muts}.txt'
     )
 
 ########################################################################
@@ -132,10 +132,9 @@ def main():
     T = Timer()
     T.start()
 
-    # Load data
     t = Timer()
-    t.start()
 
+    # Load data
     logger.info(
         f""" 
         Execute leiden clustering: \n
@@ -218,11 +217,21 @@ def main():
         final_labels.loc[lambda x: x.notna()].to_frame('MT_clones'),
         how='right'
     )
-    df.to_csv(os.path.join(path_tmp, 'trial_2_PT_full.csv'))
+    df.to_csv(
+        os.path.join(
+            path_tmp, 
+            f'take_one_off_{sample}_{filtering}_{n_muts}.csv'
+        )
+    )
 
     fig = contingency_iterative_plot(df, afm, good_quality_cells, figsize=(8,8))
     fig.tight_layout()
-    fig.savefig(os.path.join(path_viz, f'take_one_off_PT_subsampled_{n_muts}.png'), dpi=500)
+    fig.savefig(
+        os.path.join(
+            path_viz, f'take_one_off_{sample}_{filtering}_{n_muts}.png'
+        ), 
+        dpi=500
+    )
 
     # Logs out
     logger.info(f'Finished job in {T.stop()}')
