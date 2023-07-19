@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Iterative scheme trial 2
+# Take-one-off scripts
 
 ########################################################################
 
@@ -12,10 +12,10 @@ import argparse
 
 # Create the parser
 my_parser = argparse.ArgumentParser(
-    prog='iterative_trial_2',
+    prog='take_one_off_trial',
     description=
     '''
-    Take one out iretive trial.
+    Take-one-off iterative trial.
     '''
 )
 
@@ -24,7 +24,7 @@ my_parser = argparse.ArgumentParser(
 # Path_main
 my_parser.add_argument(
     '-p', 
-    '--path_mian', 
+    '--path_main', 
     type=str,
     default='..',
     help='Path to data folder. Default: .. .'
@@ -104,7 +104,6 @@ if not args.skip:
     # Code
     import os
     import warnings
-    from sklearn.metrics import normalized_mutual_info_score
     warnings.filterwarnings('ignore')
 
     from mito_utils.preprocessing import *
@@ -114,11 +113,11 @@ if not args.skip:
     from mito_utils.it_diagnostics import *
     from mito_utils.it_iterations import *
     from mito_utils.plotting_base import *
-    from mito_utils.heatmaps_plots import plot_heatmap
+    from mito_utils.it_plots import *
     
     # Set logger
     path_ = os.getcwd()
-    make_folder(path_, 'logs', boll=False)
+    make_folder(path_, 'logs', overwrite=False)
     path_ = os.path.join(path_, 'logs')
     logger = set_logger(
         path_, 
@@ -207,67 +206,12 @@ def main():
         except:
             logger.info('MQuad or vireo_vrapper ecountered errors. Finishing iterations.')
             break
-
-
+    
+    # Final labels
     logger.info(final_labels.value_counts())
-    # to_recluster = pd.Series(n_variants_final).loc[lambda x:x>1].index.astype('str')
     afm.obs = afm.obs.join(final_labels.to_frame('g'))
 
-    # g = to_recluster[2]
-    # afm.obs['GBC'] = afm.obs['GBC'].astype('str')
-    # subset = afm.obs.query('g == @g').index
-    # 
-    # a_subset = filter_cells_and_vars(afm, cells=subset)[0]
-    # a_cells, a = filter_cells_and_vars(
-    #     a_subset,
-    #     filtering='MQuad', 
-    #     min_cov_treshold=50, 
-    #     path_=os.getcwd()
-    # )
-    # labels = vireo_wrapper(a)
-    # a.obs.loc[:, 'g'] = labels
-    # 
-    # print(f'n MT-clusters: {labels.unique().size}')
-    # 
-    # a.obs.groupby('GBC').size()
-    # a.obs.groupby('g').size()
-    # rank_clone_variants(
-    #     a, var='g', group='1', rank_by='custom_perc_tresholds', filter_vars=False
-    #     # min_clone_perc=.2, max_perc_rest=.1
-    # )
-    # 
-
-    # Rank vars and find top clone, if any
-    # t = .7
-    # while t>.5:
-    #     n_vars = pd.Series({
-    #         g : rank_clone_variants(
-    #             a, var='g', group=g, rank_by='custom_perc_tresholds',
-    #             min_clone_perc=t, max_perc_rest=.1
-    #         ).shape[0] \
-    #         for g in a.obs['g'].unique()
-    #     })
-    #     one_dist = np.sum(n_vars>0)>0
-    #     if one_dist:
-    #         break
-    #     else:
-    #         t -= .05
-    # 
-    # if one_dist:
-    #     top_clone = n_vars.sort_values(ascending=False).index[0]
-    #     n_variants_final[i] = n_vars.loc[top_clone]
-    #     not_top_cells = labels.loc[lambda x: x != top_clone].index
-    #     a_cells, _ = filter_cells_and_vars(
-    #         afm, cells=not_top_cells, variants=a_cells.var_names
-    #     )
-    #     i += 1
-    #     final_labels.loc[labels.loc[lambda x: x == top_clone].index] = str(i)
-    # else:
-    #     print(f'Finished with {i} iterations. \n')
-
-
     ##
-
 
     # Process and viz
     df = afm.obs.join(
@@ -276,54 +220,12 @@ def main():
     )
     df.to_csv(os.path.join(path_tmp, 'trial_2_PT_full.csv'))
 
-
-    ##
-
-
-    # Fig   
-    fig, axs = plt.subplots(2,1,figsize=(8,8))
-
-    ari_all = custom_ARI(df['GBC'].astype('str'), df['MT_clones'].astype('str'))
-    nmi_all = normalized_mutual_info_score(df['GBC'].astype('str'), df['MT_clones'].astype('str'))
-    df_ = pd.crosstab(df['MT_clones'].astype('str'), df['GBC'].astype('str'))
-    plot_heatmap(df_, ax=axs[0], y_names_size=5, rank_diagonal=True, label='n cells')
-    perc_assigned = df.shape[0] / good_quality_cells.size
-    n_clones_gt = afm.obs.loc[good_quality_cells]['GBC'].unique().size
-    n_clones_recovered = df['GBC'].unique().size
-    t = f'''NMI: {nmi_all:.2f}, ARI: {ari_all:.2f} 
-        All clones: {n_clones_recovered}/{n_clones_gt} clones recovered, {perc_assigned*100:.2f}% cells'''
-    format_ax(title=t, ax=axs[0], rotx=90)
-    print(t)
-
-    # > 10 cells
-    top_clones = afm.obs.loc[good_quality_cells].groupby('GBC').size().loc[lambda x: x>=10].index
-    n_top_all = afm.obs.loc[good_quality_cells].query('GBC in @top_clones').shape[0]
-
-    df = df.query('GBC in @top_clones')
-    ari_top = custom_ARI(df['GBC'].astype('str'), df['MT_clones'].astype('str'))
-    nmi_top = normalized_mutual_info_score(df['GBC'].astype('str'), df['MT_clones'].astype('str'))
-
-    df_ = pd.crosstab(df['MT_clones'].astype('str'), df['GBC'].astype('str'))
-    plot_heatmap(df_, ax=axs[1], y_names_size=5, rank_diagonal=True, label='n cells')
-    n_clones_gt = (
-        afm.obs.loc[good_quality_cells]['GBC']
-        .value_counts()
-        .loc[lambda x: x>=10]  
-        .unique().size
-    )
-    n_clones_recovered = df['GBC'].unique().size
-    perc_assigned = (df.shape[0] / n_top_all) * 100
-    t = f'''NMI: {nmi_top:.2f}, ARI: {ari_top:.2f} 
-            Clones >=10 cells: {n_clones_recovered}/{n_clones_gt} clones recovered, {perc_assigned:.2f}% cells'''
-    format_ax(title=t, ax=axs[1], rotx=90)
-    print(t)
-
+    fig = contingency_iterative_plot(df, afm, good_quality_cells, figsize=(8,8))
     fig.tight_layout()
-    fig.savefig(os.path.join(path_viz, f'trial_2_PT_subsampled_{n_muts}.png'), dpi=500)
+    fig.savefig(os.path.join(path_viz, f'take_one_off_PT_subsampled_{n_muts}.png'), dpi=500)
 
     # Logs out
     logger.info(f'Finished job in {T.stop()}')
-
 
     ##
 
