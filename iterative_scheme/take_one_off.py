@@ -173,7 +173,7 @@ def main():
         try:
             a_cells, a = filter_cells_and_vars(
                 afm if i == 0 else a_cells, # First all cells and vars, then all the good ones.
-                filtering='MQuad', 
+                filtering=filtering, 
                 min_cov_treshold=50,
                 nproc=ncores,
                 path_=os.getcwd(),
