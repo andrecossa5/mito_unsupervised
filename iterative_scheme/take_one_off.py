@@ -78,6 +78,13 @@ my_parser.add_argument(
     help='Include in the analysis only cells MAESTER sites mean coverage > min_cov_treshold. Default: 50.'
 )
 
+# N max muts
+my_parser.add_argument(
+    '--n_max_mut', 
+    action='store_true',
+    help='VireoSNP clustering with max k --> n_max_mut. Default: False.'
+)
+
 # skip
 my_parser.add_argument(
     '--skip', 
@@ -95,6 +102,7 @@ min_cell_number = args.min_cell_number
 min_cov_treshold = args.min_cov_treshold
 n_muts = args.n_muts
 ncores = args.ncores
+n_max_mut = args.n_max_mut
 
 ########################################################################
 
@@ -182,7 +190,7 @@ def main():
             if i == 0:
                 good_quality_cells = a_cells.obs_names
 
-            labels = vireo_wrapper(a)
+            labels = vireo_wrapper(a, n_max_mut=n_max_mut)
             a.obs.loc[:, 'g'] = labels
 
             logger.info(f'n MT-clusters: {labels.unique().size}')
