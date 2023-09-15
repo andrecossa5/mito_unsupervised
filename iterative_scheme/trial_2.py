@@ -118,7 +118,7 @@ if not args.skip:
     
     # Set logger
     path_ = os.getcwd()
-    make_folder(path_, 'logs', boll=False)
+    make_folder(path_, 'logs', overwrite=False)
     path_ = os.path.join(path_, 'logs')
     logger = set_logger(
         path_, 
@@ -150,6 +150,8 @@ def main():
     ##
 
     # Set paths
+    # path_main = '/Users/IEO5505/Desktop/mito_bench'
+    # sample = 'PT_subsampled'
     path_data = os.path.join(path_main, 'data') 
     path_output = os.path.join(path_main, 'results', 'unsupervised_clones', 'output')
     path_viz = os.path.join(path_main, 'results', 'unsupervised_clones', 'visualization')

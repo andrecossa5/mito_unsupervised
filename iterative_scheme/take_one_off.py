@@ -145,7 +145,7 @@ def main():
     # Load data
     logger.info(
         f""" 
-        Execute leiden clustering: \n
+        Execute iterative clustering: \n
         --sample {sample} 
         --filtering {filtering} 
         --min_cell_number {min_cell_number} 
